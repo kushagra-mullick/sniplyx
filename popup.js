@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let currentUrl = '';
   let currentSummary = '';
-  let previousUrl = '';
 
   // Get the current tab URL
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -20,20 +19,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUrlElement.textContent = currentUrl;
     currentUrlElement.title = currentUrl;
     
-    // Check if we've navigated to a new URL
-    if (previousUrl !== currentUrl) {
-      // If it's a new URL, hide any previous summary
-      hideSummary();
-      previousUrl = currentUrl;
-      
-      // Check if we have a cached summary for this URL
-      chrome.storage.local.get(['summaries'], (result) => {
-        const summaries = result.summaries || {};
-        if (summaries[currentUrl]) {
-          displaySummary(summaries[currentUrl]);
-        }
-      });
-    }
+    // Check if we have a cached summary for this URL
+    chrome.storage.local.get(['summaries'], (result) => {
+      const summaries = result.summaries || {};
+      if (summaries[currentUrl]) {
+        displaySummary(summaries[currentUrl]);
+      }
+    });
   });
 
   // Summarize button click handler
@@ -134,7 +126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function summarizeContent(content) {
     try {
       // Use OpenAI API to summarize the content
-      const apiKey = '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';
+      const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
       
       // Limit content length to avoid token limits (roughly 4000 tokens max)
       const truncatedContent = content.substring(0, 12000);

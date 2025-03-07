@@ -22,11 +22,17 @@ function App() {
       setError('');
       setSummary('');
       
+      // Validate URL format
+      let validUrl = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        validUrl = 'https://' + url;
+      }
+      
       // Call the OpenAI API to summarize the article
-      const result = await summarizeArticle(url);
+      const result = await summarizeArticle(validUrl);
       setSummary(result);
-    } catch (err) {
-      console.error('Error:', err);
+    } catch (err: any) {
+      console.error('Error:', err.message || 'Unknown error');
       setError('Failed to summarize article. Please check the URL and try again.');
     } finally {
       setLoading(false);
@@ -159,7 +165,8 @@ function App() {
             Powered by OpenAI. Enter a valid URL to an article to generate a summary.
           </p>
           <p className="mt-1">
-            Note: For best results, use URLs to articles from major news sites or blogs.
+            Note: This is a preview of the Chrome extension. In the actual extension, 
+            it will automatically detect and summarize the current page.
           </p>
         </footer>
       </div>

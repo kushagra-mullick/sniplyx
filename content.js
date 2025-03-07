@@ -25,7 +25,7 @@ function extractArticleContent() {
   const mainContent = document.querySelector('main') || 
                       document.querySelector('.content') || 
                       document.querySelector('#content') ||
-                      document.querySelector('.article-content') ||
+                      document.querySelector('.article-content') || 
                       document.querySelector('.post-content') ||
                       document.querySelector('.entry-content');
   if (mainContent) {
