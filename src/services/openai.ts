@@ -1,13 +1,43 @@
 import axios from 'axios';
-import { Claude } from '@anthropic-ai/claude-sdk';
 
 const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
 
-// Initialize Claude client
-const claude = new Claude({
-  apiKey: import.meta.env.VITE_CLAUDE_API_KEY,
-  apiUrl: 'https://api.anthropic.com/v1'
-});
+function extractSentences(text: string): string[] {
+  // Split text into sentences using common sentence endings
+  return text
+    .replace(/([.?!])\s*(?=[A-Z])/g, "$1|")
+    .split("|")
+    .map(s => s.trim())
+    .filter(s => s.length > 20); // Filter out very short sentences
+}
+
+function calculateWordFrequency(text: string): Map<string, number> {
+  const words = text.toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .split(/\s+/);
+  
+  const frequency = new Map<string, number>();
+  const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']);
+  
+  words.forEach(word => {
+    if (!stopWords.has(word)) {
+      frequency.set(word, (frequency.get(word) || 0) + 1);
+    }
+  });
+  
+  return frequency;
+}
+
+function scoreSentence(sentence: string, wordFrequency: Map<string, number>): number {
+  const words = sentence.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
+  let score = 0;
+  
+  words.forEach(word => {
+    score += wordFrequency.get(word) || 0;
+  });
+  
+  return score / words.length;
+}
 
 export async function summarizeText(text: string): Promise<string> {
   try {
@@ -15,37 +45,30 @@ export async function summarizeText(text: string): Promise<string> {
       throw new Error('Text is too short to summarize');
     }
 
-    const API_KEY = import.meta.env.VITE_CLAUDE_API_KEY;
-    if (!API_KEY) {
-      throw new Error('API key not configured');
-    }
+    // Extract sentences and calculate word frequency
+    const sentences = extractSentences(text);
+    const wordFrequency = calculateWordFrequency(text);
+    
+    // Score sentences and get top 5
+    const scoredSentences = sentences.map(sentence => ({
+      sentence,
+      score: scoreSentence(sentence, wordFrequency)
+    }));
+    
+    scoredSentences.sort((a, b) => b.score - a.score);
+    
+    const topSentences = scoredSentences
+      .slice(0, 5)
+      .map(({ sentence }) => sentence);
 
-    const response = await claude.complete({
-      prompt: `Summarize this article content in a clear and concise way. Format the output with a title and bullet points highlighting key information. Here's the content: ${text}`,
-      model: 'claude-3-haiku-20240307',
-      maxTokens: 1000,
-      temperature: 0.5
-    });
-
-    if (!response.completion) {
-      throw new Error('Invalid response from summarization API');
-    }
-
-    // Format the summary in our desired style
-    const summary = response.completion;
+    // Format the summary
     const formattedSummary = `**Title:** Article Summary\n\n${
-      summary.split('\n')
-        .filter(line => line.trim())
-        .map(line => line.startsWith('•') ? line : `- ${line}`)
-        .join('\n')
+      topSentences.map(sentence => `- ${sentence.trim()}`).join('\n')
     }`;
 
     return formattedSummary;
   } catch (error: any) {
     console.error('Error summarizing article:', error.message || 'Unknown error');
-    if (error.status === 401) {
-      throw new Error('API authentication failed. Please check your API key.');
-    }
     throw new Error('Failed to summarize article: ' + (error.message || 'Unknown error'));
   }
 }
