@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Text Analyzer",
+  "name": "AI Text Analyzer Pro",
   "version": "1.0.0",
   "description": "Analyze webpages using AI for summarization, sentiment analysis, and text simplification",
   "icons": {
@@ -19,7 +19,9 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "identity",
+    "payments"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -38,6 +40,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval' https://pagead2.googlesyndication.com; object-src 'self'"
   }
 }

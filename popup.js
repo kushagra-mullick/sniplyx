@@ -9,39 +9,61 @@ document.addEventListener('DOMContentLoaded', async () => {
   const summaryContent = document.getElementById('summary-content');
   const copyBtn = document.getElementById('copy-btn');
   const openBtn = document.getElementById('open-btn');
-  const analysisContainer = document.getElementById('analysis-container');
-  const sentimentIndicator = document.getElementById('sentiment-indicator');
-  const entitiesList = document.getElementById('entities-list');
-  const simplifiedTextContent = document.getElementById('simplified-text-content');
+  const upgradeBtn = document.getElementById('upgrade-btn');
+  const upgradeLink = document.getElementById('upgrade-link');
+  const premiumFeatures = document.getElementById('premium-features');
+  const adContainer = document.getElementById('ad-container');
 
   let currentUrl = '';
   let currentSummary = '';
   let currentAnalysis = null;
+  let licenseModalVisible = false;
 
   // Initialize TensorFlow.js
   await tf.ready();
+  
+  // Check license status and update UI
+  const { LicenseManager } = await import('./services/license.js');
+  const licenseManager = LicenseManager.getInstance();
+  const currentTier = await licenseManager.getCurrentTier();
+  
+  if (currentTier === 'FREE') {
+    premiumFeatures.classList.remove('hidden');
+    adContainer.innerHTML = 'Advertisement Space';
+  } else {
+    adContainer.classList.add('hidden');
+  }
   
   // Get the current tab URL
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     currentUrl = tabs[0].url;
     currentUrlElement.textContent = currentUrl;
     currentUrlElement.title = currentUrl;
-    
-    // Check if we have a cached analysis for this URL
-    chrome.storage.local.get(['analyses'], (result) => {
-      const analyses = result.analyses || {};
-      if (analyses[currentUrl]) {
-        displayAnalysis(analyses[currentUrl]);
-      }
-    });
   });
+
+  async function showLicenseModal() {
+    if (licenseModalVisible) return;
+    
+    const { LicenseModal } = await import('./components/LicenseModal.js');
+    const modalContainer = document.createElement('div');
+    document.body.appendChild(modalContainer);
+    
+    new LicenseModal({
+      isOpen: true,
+      onClose: () => {
+        modalContainer.remove();
+        licenseModalVisible = false;
+      }
+    }).render(modalContainer);
+    
+    licenseModalVisible = true;
+  }
 
   // Analyze button click handler
   summarizeBtn.addEventListener('click', async () => {
     try {
       setLoading(true);
       hideError();
-      hideAnalysis();
 
       // Send message to content script to get the page content
       chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
@@ -90,14 +112,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       
       const analysis = await analyzeText(content);
-      
-      // Cache the analysis
-      chrome.storage.local.get(['analyses'], (result) => {
-        const analyses = result.analyses || {};
-        analyses[currentUrl] = analysis;
-        chrome.storage.local.set({ analyses });
-      });
-
       displayAnalysis(analysis);
     } catch (error) {
       showError(error.message || 'Failed to analyze article. Please try again.');
@@ -238,5 +252,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Open original article button click handler
   openBtn.addEventListener('click', () => {
     chrome.tabs.create({ url: currentUrl });
+  });
+
+  upgradeBtn.addEventListener('click', () => {
+    showLicenseModal();
+  });
+
+  upgradeLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    showLicenseModal();
   });
 });

@@ -32,6 +32,15 @@
         <span class="loading-spinner hidden"></span>
       </button>
 
+      <div id="premium-features" class="hidden">
+        <div class="premium-banner">
+          <p>🌟 Unlock Premium Features</p>
+          <button id="upgrade-btn" class="secondary-btn">Upgrade Now</button>
+        </div>
+      </div>
+
+      <div id="ad-container" class="ad-space"></div>
+
       <div id="error-container" class="hidden">
         <div class="error-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -83,11 +92,9 @@
     </div>
 
     <footer>
-      <p>Powered by TensorFlow.js and ML5.js</p>
+      <p>Powered by AI • <a href="#" id="upgrade-link">Upgrade to Pro</a></p>
     </footer>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
