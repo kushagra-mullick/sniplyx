@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Article Summarizer</title>
+  <title>AI Text Analyzer</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -16,9 +16,9 @@
           <path d="M15 18h-5"></path>
           <path d="M10 6h8v4h-8V6Z"></path>
         </svg>
-        <h1>ArticleSummarizer</h1>
+        <h1>AI Text Analyzer</h1>
       </div>
-      <p class="subtitle">Summarize any article with AI</p>
+      <p class="subtitle">Analyze any webpage with AI</p>
     </header>
 
     <div class="content">
@@ -28,7 +28,7 @@
       </div>
 
       <button id="summarize-btn" class="primary-btn">
-        <span class="btn-text">Summarize This Page</span>
+        <span class="btn-text">Analyze This Page</span>
         <span class="loading-spinner hidden"></span>
       </button>
 
@@ -45,7 +45,7 @@
 
       <div id="summary-container" class="hidden">
         <div class="summary-header">
-          <h2>Summary</h2>
+          <h2>Analysis Results</h2>
           <div class="actions">
             <button id="copy-btn" title="Copy to clipboard">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -62,14 +62,32 @@
             </button>
           </div>
         </div>
-        <div id="summary-content"></div>
+        <div id="summary-content" class="mb-4"></div>
+        
+        <div id="analysis-container" class="hidden">
+          <div class="analysis-section mb-4">
+            <h3 class="text-lg font-semibold mb-2">Sentiment</h3>
+            <div id="sentiment-indicator"></div>
+          </div>
+          
+          <div class="analysis-section mb-4">
+            <h3 class="text-lg font-semibold mb-2">Key Entities</h3>
+            <div id="entities-list"></div>
+          </div>
+          
+          <div class="analysis-section">
+            <div id="simplified-text-content"></div>
+          </div>
+        </div>
       </div>
     </div>
 
     <footer>
-      <p>Powered by OpenAI</p>
+      <p>Powered by TensorFlow.js and ML5.js</p>
     </footer>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

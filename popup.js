@@ -9,35 +9,42 @@ document.addEventListener('DOMContentLoaded', async () => {
   const summaryContent = document.getElementById('summary-content');
   const copyBtn = document.getElementById('copy-btn');
   const openBtn = document.getElementById('open-btn');
+  const analysisContainer = document.getElementById('analysis-container');
+  const sentimentIndicator = document.getElementById('sentiment-indicator');
+  const entitiesList = document.getElementById('entities-list');
+  const simplifiedTextContent = document.getElementById('simplified-text-content');
 
   let currentUrl = '';
   let currentSummary = '';
+  let currentAnalysis = null;
 
+  // Initialize TensorFlow.js
+  await tf.ready();
+  
   // Get the current tab URL
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     currentUrl = tabs[0].url;
     currentUrlElement.textContent = currentUrl;
     currentUrlElement.title = currentUrl;
     
-    // Check if we have a cached summary for this URL
-    chrome.storage.local.get(['summaries'], (result) => {
-      const summaries = result.summaries || {};
-      if (summaries[currentUrl]) {
-        displaySummary(summaries[currentUrl]);
+    // Check if we have a cached analysis for this URL
+    chrome.storage.local.get(['analyses'], (result) => {
+      const analyses = result.analyses || {};
+      if (analyses[currentUrl]) {
+        displayAnalysis(analyses[currentUrl]);
       }
     });
   });
 
-  // Summarize button click handler
+  // Analyze button click handler
   summarizeBtn.addEventListener('click', async () => {
     try {
       setLoading(true);
       hideError();
-      hideSummary();
+      hideAnalysis();
 
       // Send message to content script to get the page content
       chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-        // Update current URL to ensure we're summarizing the correct page
         currentUrl = tabs[0].url;
         currentUrlElement.textContent = currentUrl;
         currentUrlElement.title = currentUrl;
@@ -47,7 +54,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           { action: 'getPageContent' },
           async (response) => {
             if (chrome.runtime.lastError) {
-              // Content script might not be loaded yet
               try {
                 await injectContentScript(tabs[0].id);
                 chrome.tabs.sendMessage(
@@ -79,26 +85,70 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const content = response.content;
       
-      // Check if content is too short
       if (content.length < 100) {
-        throw new Error('The extracted content is too short to summarize. Please try a different page.');
+        throw new Error('The extracted content is too short to analyze. Please try a different page.');
       }
       
-      const summary = await summarizeContent(content);
+      const analysis = await analyzeText(content);
       
-      // Cache the summary
-      chrome.storage.local.get(['summaries'], (result) => {
-        const summaries = result.summaries || {};
-        summaries[currentUrl] = summary;
-        chrome.storage.local.set({ summaries });
+      // Cache the analysis
+      chrome.storage.local.get(['analyses'], (result) => {
+        const analyses = result.analyses || {};
+        analyses[currentUrl] = analysis;
+        chrome.storage.local.set({ analyses });
       });
 
-      displaySummary(summary);
+      displayAnalysis(analysis);
     } catch (error) {
-      showError(error.message || 'Failed to summarize article. Please try again.');
+      showError(error.message || 'Failed to analyze article. Please try again.');
     } finally {
       setLoading(false);
     }
+  }
+
+  function displayAnalysis(analysis) {
+    currentAnalysis = analysis;
+    
+    // Display summary
+    summaryContent.innerHTML = `
+      <h3>Summary</h3>
+      <p>${analysis.summary}</p>
+    `;
+    
+    // Display sentiment
+    const sentimentColor = {
+      positive: 'bg-green-500',
+      neutral: 'bg-gray-500',
+      negative: 'bg-red-500'
+    }[analysis.sentiment.sentiment];
+    
+    sentimentIndicator.innerHTML = `
+      <div class="flex items-center gap-2">
+        <div class="${sentimentColor} w-3 h-3 rounded-full"></div>
+        <span class="capitalize">${analysis.sentiment.sentiment}</span>
+      </div>
+    `;
+    
+    // Display entities
+    entitiesList.innerHTML = Object.entries(analysis.entities)
+      .filter(([_, values]) => values.length > 0)
+      .map(([type, values]) => `
+        <div class="mb-2">
+          <h4 class="font-semibold capitalize">${type}</h4>
+          <ul class="list-disc list-inside">
+            ${values.map(value => `<li>${value}</li>`).join('')}
+          </ul>
+        </div>
+      `).join('');
+    
+    // Display simplified text
+    simplifiedTextContent.innerHTML = `
+      <h3>Simplified Version</h3>
+      <p>${analysis.simplifiedText}</p>
+    `;
+    
+    summaryContainer.classList.remove('hidden');
+    analysisContainer.classList.remove('hidden');
   }
 
   async function injectContentScript(tabId) {
@@ -123,98 +173,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  async function summarizeContent(content) {
-    try {
-      // Use OpenAI API to summarize the content
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
-      
-      // Limit content length to avoid token limits (roughly 4000 tokens max)
-      const truncatedContent = content.substring(0, 12000);
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [
-            {
-              role: "system",
-              content: `You are an advanced AI that summarizes online articles.
-              When given article content, generate a concise, easy-to-read summary.
-              
-              Instructions:
-              1. Identify the main idea, key arguments, and conclusion.
-              2. Remove unnecessary details, fluff, and ads.
-              3. Generate a short summary (100-150 words) with bullet points.
-              4. If the article contains important data or statistics, include them.
-              
-              Format your response like this:
-              **Title:** [Descriptive title based on content]
-              
-              - [Key point 1 with **important terms** in bold]
-              - [Key point 2 with **important terms** in bold]
-              - [Key point 3 with **important terms** in bold]
-              - Conclusion: [Brief conclusion with **important terms** in bold]`
-            },
-            {
-              role: "user",
-              content: `Summarize this article content: ${truncatedContent}`
-            }
-          ],
-          temperature: 0.5,
-          max_tokens: 500
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('OpenAI API error:', errorData);
-        throw new Error(`Failed to summarize article (${response.status})`);
-      }
-      
-      const data = await response.json();
-      return data.choices[0].message.content;
-    } catch (error) {
-      console.error('Error summarizing content:', error);
-      throw new Error('Failed to summarize article. Please check your internet connection and try again.');
-    }
-  }
-
-  function displaySummary(summary) {
-    currentSummary = summary;
-    
-    // Format the summary for display
-    let formattedSummary = '';
-    
-    summary.split('\n\n').forEach((paragraph) => {
-      if (paragraph.startsWith('**Title:**')) {
-        const title = paragraph.replace('**Title:** ', '');
-        formattedSummary += `<h3>${title}</h3>`;
-      } else {
-        formattedSummary += '<ul>';
-        paragraph.split('\n').forEach((line) => {
-          if (line.startsWith('- ')) {
-            const content = line.substring(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            formattedSummary += `<li>${content}</li>`;
-          } else {
-            const content = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            formattedSummary += `<p>${content}</p>`;
-          }
-        });
-        formattedSummary += '</ul>';
-      }
-    });
-    
-    summaryContent.innerHTML = formattedSummary;
-    summaryContainer.classList.remove('hidden');
-  }
-
-  function hideSummary() {
+  function hideAnalysis() {
     summaryContainer.classList.add('hidden');
+    analysisContainer.classList.add('hidden');
     summaryContent.innerHTML = '';
+    sentimentIndicator.innerHTML = '';
+    entitiesList.innerHTML = '';
+    simplifiedTextContent.innerHTML = '';
   }
 
   function showError(message) {
@@ -231,17 +196,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isLoading) {
       summarizeBtn.disabled = true;
       loadingSpinner.classList.remove('hidden');
-      btnText.textContent = 'Summarizing...';
+      btnText.textContent = 'Analyzing...';
     } else {
       summarizeBtn.disabled = false;
       loadingSpinner.classList.add('hidden');
-      btnText.textContent = 'Summarize This Page';
+      btnText.textContent = 'Analyze This Page';
     }
   }
 
   // Copy button click handler
   copyBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(currentSummary);
+    const textToCopy = currentAnalysis ? 
+      `Summary:\n${currentAnalysis.summary}\n\n` +
+      `Sentiment: ${currentAnalysis.sentiment.sentiment}\n\n` +
+      `Key Entities:\n${Object.entries(currentAnalysis.entities)
+        .filter(([_, values]) => values.length > 0)
+        .map(([type, values]) => `${type}: ${values.join(', ')}`)
+        .join('\n')}\n\n` +
+      `Simplified Text:\n${currentAnalysis.simplifiedText}` :
+      '';
+    
+    navigator.clipboard.writeText(textToCopy);
     
     // Show feedback
     copyBtn.innerHTML = `
